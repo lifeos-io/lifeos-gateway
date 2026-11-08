@@ -18,6 +18,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <ul>
  *   <li>{@code .../slow} answers after 3 s</li>
  *   <li>{@code .../messages} streams 4 SSE events, one every 500 ms</li>
+ *   <li>{@code .../stalled/messages} sends one SSE event, then nothing for 5 s</li>
  *   <li>anything else echoes the request path and headers as JSON (header names lower-case)</li>
  * </ul>
  */
@@ -64,6 +65,13 @@ public final class TestBackend {
             if (path.endsWith("/slow")) {
                 Thread.sleep(3000);
                 send(exchange, 200, "application/json", "{\"slow\":true}");
+            } else if (path.endsWith("/stalled/messages")) {
+                exchange.getResponseHeaders().put("Content-Type", List.of("text/event-stream"));
+                exchange.sendResponseHeaders(200, 0);
+                OutputStream out = exchange.getResponseBody();
+                out.write("event: started\ndata: {}\n\n".getBytes(StandardCharsets.UTF_8));
+                out.flush();
+                Thread.sleep(5000);
             } else if (path.endsWith("/messages")) {
                 exchange.getResponseHeaders().put("Content-Type", List.of("text/event-stream"));
                 exchange.sendResponseHeaders(200, 0);

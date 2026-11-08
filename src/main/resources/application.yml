@@ -23,8 +23,8 @@ spring:
             connect-timeout: 2000      # ms
             response-timeout: 10s      # default for every route; the coach stream route turns it off
           routes:
-            # Coach chat answers stream over SSE: no total response timeout and no circuit breaker
-            # (its time limiter would cut the stream). Must be matched before the generic coach route.
+            # Coach chat answers stream over SSE: no circuit breaker (its time limiter would cut the stream),
+            # an idle limit between chunks instead. Must be matched before the generic coach route.
             - id: coach-chat-stream
               order: -1
               uri: ${COACH_URI:http://localhost:8082}
@@ -32,7 +32,10 @@ spring:
                 - Path=/api/coach/conversations/*/messages
                 - Method=POST
               metadata:
-                response-timeout: -1
+                response-timeout: 60000        # ms until the response headers arrive (the stream itself is not limited)
+              filters:
+                # No data for this long (the coach sends ": ping" every 15 s) → close the stream with an error event.
+                - StreamIdleTimeout=${COACH_STREAM_IDLE_TIMEOUT:60s}
             - id: strategy
               uri: ${STRATEGY_URI:http://localhost:8081}
               predicates:

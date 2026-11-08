@@ -34,6 +34,14 @@ public class ProblemWriter {
         if (response.isCommitted()) {
             return Mono.empty();
         }
+        response.setStatusCode(HttpStatusCode.valueOf(code.status()));
+        response.getHeaders().setContentType(MediaType.APPLICATION_PROBLEM_JSON);
+        DataBuffer buffer = response.bufferFactory().wrap(toJson(exchange, code, detail));
+        return response.writeWith(Mono.just(buffer));
+    }
+
+    /** The problem body alone, e.g. as the data of an SSE {@code error} event once a stream is under way. */
+    public byte[] toJson(ServerWebExchange exchange, ErrorCode code, String detail) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("type", TYPE_PREFIX + code.code());
         body.put("title", code.title());
@@ -45,9 +53,6 @@ public class ProblemWriter {
         if (correlationId != null) {
             body.put("correlationId", correlationId);
         }
-        response.setStatusCode(HttpStatusCode.valueOf(code.status()));
-        response.getHeaders().setContentType(MediaType.APPLICATION_PROBLEM_JSON);
-        DataBuffer buffer = response.bufferFactory().wrap(jsonMapper.writeValueAsBytes(body));
-        return response.writeWith(Mono.just(buffer));
+        return jsonMapper.writeValueAsBytes(body);
     }
 }

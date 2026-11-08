@@ -28,7 +28,8 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * The production routes from application.yml, pointed at fake services: path routing, the 1 s response timeout,
- * the timeout-free coach stream route, an unreachable service and the circuit breaker opening.
+ * the coach stream route (not cut by that timeout, but by its 1 s idle limit), an unreachable service and the
+ * circuit breaker opening.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "management.health.redis.enabled=false",
@@ -36,7 +37,8 @@ import tools.jackson.databind.json.JsonMapper;
         "lifeos.gateway.circuit-breaker.sliding-window-size=4",
         "lifeos.gateway.circuit-breaker.minimum-number-of-calls=4",
         "lifeos.gateway.circuit-breaker.wait-in-open-state=60s",
-        "lifeos.gateway.circuit-breaker.time-limit=3s"
+        "lifeos.gateway.circuit-breaker.time-limit=3s",
+        "COACH_STREAM_IDLE_TIMEOUT=1s"
 })
 @Import(GatewayRoutingIntegrationTest.Jwt.class)
 class GatewayRoutingIntegrationTest {
@@ -92,6 +94,24 @@ class GatewayRoutingIntegrationTest {
         assertEquals(200, response.statusCode());
         assertTrue(response.body().contains("data: part-4"), response.body());
         assertTrue(tookMs > 1500, "stream ran past the 1 s response timeout: " + tookMs + " ms");
+    }
+
+    @Test
+    void stalledCoachStreamEndsWithAnErrorEventAfterTheIdleLimit() throws Exception {
+        long started = System.nanoTime();
+        HttpResponse<String> response = send("POST", "/api/coach/conversations/stalled/messages");
+        long tookMs = (System.nanoTime() - started) / 1_000_000;
+
+        assertEquals(200, response.statusCode());
+        String body = response.body();
+        assertTrue(body.startsWith("event: started\n"), body);
+        String marker = "event: error\ndata: ";
+        int error = body.indexOf(marker);
+        assertTrue(error > 0, body);
+        JsonNode problem = json.readTree(body.substring(error + marker.length()).strip());
+        assertEquals("GATEWAY_UPSTREAM_TIMEOUT", problem.get("code").asString());
+        assertTrue(problem.hasNonNull("correlationId"));
+        assertTrue(tookMs >= 1000 && tookMs < 4000, "cut after the 1 s idle limit, not the 5 s stall: " + tookMs + " ms");
     }
 
     @Test
