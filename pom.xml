@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.lifeos</groupId>
         <artifactId>lifeos-root-pom</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>0.1.0</version>
         <relativePath/>
     </parent>
 
@@ -17,7 +17,7 @@
     <description>Single entry point: JWT validation, rate limiting, routing</description>
 
     <properties>
-        <lifeos-base.version>0.1.0-SNAPSHOT</lifeos-base.version>
+        <lifeos-base.version>0.1.1</lifeos-base.version>
     </properties>
 
     <!-- Used to resolve the parent POM and lifeos-base when they are not in the local ~/.m2 (e.g. in CI).
