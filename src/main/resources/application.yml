@@ -77,7 +77,19 @@ lifeos:
       # Must stay above the HTTP response timeout, so a slow service is reported as 504, not cut by the limiter.
       time-limit: 12s
 
-# Rate limiting will be added in the next step.
+    # Per-user token buckets in Redis. Off for now (single user, no quota decided); turn on with RATE_LIMIT_ENABLED.
+    rate-limit:
+      enabled: ${RATE_LIMIT_ENABLED:false}
+      defaults:
+        replenish-rate: 10             # requests per second per user, sustained
+        burst-capacity: 20             # short burst allowed at once
+      routes:
+        coach:                         # LLM calls cost money: stricter
+          replenish-rate: 1
+          burst-capacity: 5
+        coach-chat-stream:
+          replenish-rate: 1
+          burst-capacity: 3
 
 server:
   port: 8080
