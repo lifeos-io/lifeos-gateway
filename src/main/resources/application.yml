@@ -12,6 +12,52 @@ spring:
           issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/lifeos}
           # Keycloak adds this audience to access tokens (audience mapper on client lifeos-mobile).
           audiences: ${JWT_AUDIENCES:lifeos-api}
+  cloud:
+    gateway:
+      server:
+        webflux:
+          httpclient:
+            connect-timeout: 2000      # ms
+            response-timeout: 10s      # default for every route; the coach stream route turns it off
+          routes:
+            # Coach chat answers stream over SSE: no total response timeout and no circuit breaker
+            # (its time limiter would cut the stream). Must be matched before the generic coach route.
+            - id: coach-chat-stream
+              order: -1
+              uri: ${COACH_URI:http://localhost:8082}
+              predicates:
+                - Path=/api/coach/conversations/*/messages
+                - Method=POST
+              metadata:
+                response-timeout: -1
+            - id: strategy
+              uri: ${STRATEGY_URI:http://localhost:8081}
+              predicates:
+                - Path=/api/strategy/**
+              filters:
+                - name: CircuitBreaker
+                  args: { name: strategy, fallbackUri: "forward:/fallback/strategy" }
+            - id: coach
+              uri: ${COACH_URI:http://localhost:8082}
+              predicates:
+                - Path=/api/coach/**
+              filters:
+                - name: CircuitBreaker
+                  args: { name: coach, fallbackUri: "forward:/fallback/coach" }
+            - id: triggers
+              uri: ${TRIGGER_URI:http://localhost:8083}
+              predicates:
+                - Path=/api/triggers/**
+              filters:
+                - name: CircuitBreaker
+                  args: { name: triggers, fallbackUri: "forward:/fallback/triggers" }
+            - id: notifications
+              uri: ${NOTIFICATION_URI:http://localhost:8084}
+              predicates:
+                - Path=/api/notifications/**
+              filters:
+                - name: CircuitBreaker
+                  args: { name: notifications, fallbackUri: "forward:/fallback/notifications" }
 
 lifeos:
   security:
@@ -20,8 +66,18 @@ lifeos:
       - /actuator/health
       - /actuator/health/**
       - /actuator/info
+  gateway:
+    # Defaults for every route's circuit breaker (Resilience4j).
+    circuit-breaker:
+      sliding-window-size: 20          # last N calls are evaluated
+      minimum-number-of-calls: 10      # no decision before this many calls
+      failure-rate-threshold: 50       # % failed calls that opens the breaker
+      wait-in-open-state: 10s          # fail fast for this long, then let a few calls probe
+      permitted-calls-in-half-open-state: 3
+      # Must stay above the HTTP response timeout, so a slow service is reported as 504, not cut by the limiter.
+      time-limit: 12s
 
-# Routes, rate limiting and circuit breaker settings will be added once the gateway strategy is defined.
+# Rate limiting will be added in the next step.
 
 server:
   port: 8080

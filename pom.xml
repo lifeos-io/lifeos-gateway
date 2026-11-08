@@ -49,6 +49,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- Per-route circuit breaker (Spring Cloud CircuitBreaker on Resilience4j, reactive) -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-circuitbreaker-reactor-resilience4j</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.lifeos</groupId>
             <artifactId>lifeos-base-core</artifactId>
