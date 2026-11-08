@@ -17,7 +17,7 @@
     <description>Single entry point: JWT validation, rate limiting, routing</description>
 
     <properties>
-        <lifeos-base.version>0.1.1</lifeos-base.version>
+        <lifeos-base.version>0.2.0</lifeos-base.version>
     </properties>
 
     <!-- Used to resolve the parent POM and lifeos-base when they are not in the local ~/.m2 (e.g. in CI).
@@ -51,7 +51,7 @@
         </dependency>
         <dependency>
             <groupId>com.lifeos</groupId>
-            <artifactId>lifeos-base</artifactId>
+            <artifactId>lifeos-base-core</artifactId>
             <version>${lifeos-base.version}</version>
         </dependency>
         <dependency>
