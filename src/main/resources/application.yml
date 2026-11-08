@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: lifeos-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/lifeos}
+
+# Routes, rate limiting and circuit breaker settings will be added once the gateway strategy is defined.
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
