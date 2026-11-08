@@ -1,11 +1,14 @@
 package com.lifeos.gateway.error;
 
+import com.lifeos.base.correlation.CorrelationIds;
 import com.lifeos.base.error.CommonErrorCode;
 import com.lifeos.base.error.ErrorCode;
+import com.lifeos.gateway.correlation.CorrelationIdWebFilter;
 import java.net.ConnectException;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -37,8 +40,13 @@ public class GatewayErrorWebExceptionHandler implements WebExceptionHandler {
         }
         Mapped mapped = map(ex);
         if (mapped.code().status() >= 500) {
-            log.warn("{} {} failed: {}", exchange.getRequest().getMethod(), exchange.getRequest().getPath(),
-                    mapped.code().code(), ex);
+            // Error handlers run outside the filter chain's Reactor context, so set the MDC by hand.
+            String correlationId = CorrelationIdWebFilter.of(exchange);
+            try (MDC.MDCCloseable ignored = correlationId == null ? null
+                    : MDC.putCloseable(CorrelationIds.MDC_KEY, correlationId)) {
+                log.warn("{} {} failed: {}", exchange.getRequest().getMethod(), exchange.getRequest().getPath(),
+                        mapped.code().code(), ex);
+            }
         }
         return problems.write(exchange, mapped.code(), mapped.detail());
     }

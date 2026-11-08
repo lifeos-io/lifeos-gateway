@@ -1,6 +1,9 @@
 spring:
   application:
     name: lifeos-gateway
+  reactor:
+    # Reactor copies context values (the correlation ID) into ThreadLocals such as the MDC on every operator.
+    context-propagation: auto
   data:
     redis:
       host: ${REDIS_HOST:localhost}
@@ -93,6 +96,11 @@ lifeos:
 
 server:
   port: 8080
+
+logging:
+  pattern:
+    # Every log line carries the request's correlation ID, the same value the services log and return.
+    correlation: "[%X{correlationId:-}] "
 
 management:
   endpoints:
