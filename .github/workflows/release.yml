@@ -1,0 +1,76 @@
+name: release
+
+# Push to a release/X.Y.Z branch to release version X.Y.Z.
+# A version is released once: if tag vX.Y.Z already exists the run stops,
+# so a fix goes out on a new branch (release/X.Y.Z+1).
+on:
+  push:
+    branches: ['release/*']
+
+permissions:
+  contents: write   # push the vX.Y.Z tag
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# Every Maven step may resolve lifeos-* artifacts from GitHub Packages, so the token is workflow-wide.
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from branch name
+        run: |
+          VERSION="${GITHUB_REF_NAME#release/}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Branch must be named release/X.Y.Z, got '$GITHUB_REF_NAME'"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" > /dev/null; then
+            echo "::error::v$VERSION is already released. Cut a new release/X.Y.Z branch for further changes."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+
+      - name: Set version
+        run: mvn -B versions:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false
+
+      - name: Build and test
+        run: mvn -B verify
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ env.VERSION }}
+            ${{ env.IMAGE }}:${{ github.sha }}
+
+      - name: Tag the release
+        run: |
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
